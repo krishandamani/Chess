@@ -1,0 +1,21 @@
+# Railway service config for the Celery worker (CPU-bound Stockfish analysis)
+# Deploy as a SECOND Railway service pointing at the same repo root.
+
+[build]
+dockerfilePath = "worker/Dockerfile"
+buildContext = "worker"
+
+[deploy]
+# --concurrency=2 → 2 Stockfish processes per service instance
+startCommand = "celery -A celery_app worker --loglevel=info --concurrency=2 --queues=ingest,analysis"
+restartPolicyType = "on_failure"
+restartPolicyMaxRetries = 5
+
+# Scale to 0 when queue is empty (configure in Railway dashboard under "Scaling")
+# Minimum instances: 0   Maximum instances: 2
+
+# Environment variables (same as backend, minus Stripe/CORS):
+# DATABASE_URL
+# REDIS_URL              (Railway internal URL — same Redis addon as backend)
+# ENVIRONMENT=production
+# STOCKFISH_PATH=/usr/games/stockfish   (default in Dockerfile; set if binary path differs)

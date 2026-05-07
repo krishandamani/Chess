@@ -1,0 +1,26 @@
+# Railway service config for the FastAPI backend
+# Apply this config in the Railway dashboard or via railway CLI:
+#   railway up --service backend
+
+[build]
+dockerfilePath = "backend/Dockerfile"
+buildContext = "backend"
+
+[deploy]
+startCommand = "uvicorn app.main:app --host 0.0.0.0 --port $PORT"
+healthcheckPath = "/api/health"
+healthcheckTimeout = 30
+restartPolicyType = "on_failure"
+restartPolicyMaxRetries = 5
+
+# Environment variables to set in Railway dashboard:
+# SUPABASE_URL
+# SUPABASE_ANON_KEY
+# SUPABASE_SERVICE_ROLE_KEY
+# SUPABASE_JWT_SECRET
+# DATABASE_URL           (from Railway Postgres addon or Supabase direct connection)
+# REDIS_URL              (from Railway Redis addon — injected automatically as $REDIS_URL)
+# STRIPE_SECRET_KEY
+# STRIPE_WEBHOOK_SECRET
+# ENVIRONMENT=production
+# FRONTEND_URL           (your Vercel deployment URL)
