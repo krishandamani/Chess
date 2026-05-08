@@ -1,9 +1,10 @@
--- ── profiles ──────────────────────────────────────────────────────────────────
--- Mirrors minimal data from auth.users; created on first sign-in via trigger.
-create table profiles (
-  id uuid primary key references auth.users(id) on delete cascade,
-  display_name text,
-  email text not null,
+-- ── users ──────────────────────────────────────────────────────────────────────
+-- Primary user table. Created on first OAuth sign-in via NextAuth callback.
+create table if not exists users (
+  id uuid primary key default gen_random_uuid(),
+  email text not null unique,
+  name text,
+  image text,
   chesscom_username text,
   lichess_username text,
   stripe_customer_id text,
@@ -14,28 +15,15 @@ create table profiles (
   created_at timestamptz not null default now()
 );
 
-create index profiles_chesscom on profiles(chesscom_username) where chesscom_username is not null;
-create index profiles_lichess  on profiles(lichess_username)  where lichess_username  is not null;
-
--- Auto-create profile on sign-up
-create or replace function handle_new_user()
-returns trigger language plpgsql security definer set search_path = public as $$
-begin
-  insert into public.profiles (id, email)
-  values (new.id, new.email);
-  return new;
-end;
-$$;
-
-create trigger on_auth_user_created
-  after insert on auth.users
-  for each row execute procedure handle_new_user();
+create index if not exists users_chesscom on users(chesscom_username) where chesscom_username is not null;
+create index if not exists users_lichess  on users(lichess_username)  where lichess_username  is not null;
+create index if not exists users_email    on users(email);
 
 
 -- ── games ──────────────────────────────────────────────────────────────────────
-create table games (
+create table if not exists games (
   id uuid primary key default gen_random_uuid(),
-  user_id uuid not null references profiles(id) on delete cascade,
+  user_id uuid not null references users(id) on delete cascade,
   source text not null check (source in ('chesscom', 'lichess', 'pgn_upload')),
   external_id text,
   played_at timestamptz not null,
@@ -53,12 +41,12 @@ create table games (
   unique (user_id, source, external_id)
 );
 
-create index games_user_played on games(user_id, played_at desc);
-create index games_user_eco    on games(user_id, eco_code);
+create index if not exists games_user_played on games(user_id, played_at desc);
+create index if not exists games_user_eco    on games(user_id, eco_code);
 
 
 -- ── position_evals — globally shared across all users ─────────────────────────
-create table position_evals (
+create table if not exists position_evals (
   fen_hash text primary key,
   fen text not null,
   depth int not null,
@@ -74,10 +62,10 @@ create table position_evals (
 
 
 -- ── mistakes ───────────────────────────────────────────────────────────────────
-create table mistakes (
+create table if not exists mistakes (
   id uuid primary key default gen_random_uuid(),
   game_id uuid not null references games(id) on delete cascade,
-  user_id uuid not null references profiles(id) on delete cascade,
+  user_id uuid not null references users(id) on delete cascade,
   ply int not null,
   move_number int not null,
   fen_before text not null,
@@ -99,16 +87,16 @@ create table mistakes (
   created_at timestamptz not null default now()
 );
 
-create index mistakes_user             on mistakes(user_id, created_at desc);
-create index mistakes_user_game        on mistakes(user_id, game_id);
-create index mistakes_user_piece_sq    on mistakes(user_id, piece_moved, from_square);
+create index if not exists mistakes_user          on mistakes(user_id, created_at desc);
+create index if not exists mistakes_user_game     on mistakes(user_id, game_id);
+create index if not exists mistakes_user_piece_sq on mistakes(user_id, piece_moved, from_square);
 
 
 -- ── puzzles ────────────────────────────────────────────────────────────────────
-create table puzzles (
+create table if not exists puzzles (
   id uuid primary key default gen_random_uuid(),
   mistake_id uuid not null unique references mistakes(id) on delete cascade,
-  user_id uuid not null references profiles(id) on delete cascade,
+  user_id uuid not null references users(id) on delete cascade,
   fen text not null,
   side_to_move text not null check (side_to_move in ('white', 'black')),
   solution text not null,
@@ -118,14 +106,14 @@ create table puzzles (
   created_at timestamptz not null default now()
 );
 
-create index puzzles_user   on puzzles(user_id, created_at desc);
-create index puzzles_motifs on puzzles using gin(motifs);
+create index if not exists puzzles_user   on puzzles(user_id, created_at desc);
+create index if not exists puzzles_motifs on puzzles using gin(motifs);
 
 
 -- ── patterns ───────────────────────────────────────────────────────────────────
-create table patterns (
+create table if not exists patterns (
   id uuid primary key default gen_random_uuid(),
-  user_id uuid not null references profiles(id) on delete cascade,
+  user_id uuid not null references users(id) on delete cascade,
   kind text not null,
   title text not null,
   description text not null,
@@ -140,16 +128,16 @@ create table patterns (
   updated_at timestamptz not null default now()
 );
 
-create index patterns_user_severity on patterns(user_id, severity_score desc);
+create index if not exists patterns_user_severity on patterns(user_id, severity_score desc);
 
-create table pattern_mistakes (
+create table if not exists pattern_mistakes (
   pattern_id uuid not null references patterns(id) on delete cascade,
   mistake_id uuid not null references mistakes(id) on delete cascade,
   primary key (pattern_id, mistake_id)
 );
 
-create table pattern_dismissals (
-  user_id    uuid not null references profiles(id) on delete cascade,
+create table if not exists pattern_dismissals (
+  user_id    uuid not null references users(id) on delete cascade,
   pattern_id uuid not null references patterns(id) on delete cascade,
   dismissed_at timestamptz not null default now(),
   primary key (user_id, pattern_id)
@@ -157,10 +145,10 @@ create table pattern_dismissals (
 
 
 -- ── reviews — FSRS state per puzzle per user ───────────────────────────────────
-create table reviews (
+create table if not exists reviews (
   id uuid primary key default gen_random_uuid(),
   puzzle_id uuid not null references puzzles(id) on delete cascade,
-  user_id uuid not null references profiles(id) on delete cascade,
+  user_id uuid not null references users(id) on delete cascade,
   stability real not null,
   difficulty real not null,
   elapsed_days real not null default 0,
@@ -173,9 +161,9 @@ create table reviews (
   unique (puzzle_id, user_id)
 );
 
-create index reviews_due on reviews(user_id, due_at) where state in ('learning', 'review', 'relapsed');
+create index if not exists reviews_due on reviews(user_id, due_at) where state in ('learning', 'review', 'relapsed');
 
-create table review_logs (
+create table if not exists review_logs (
   id uuid primary key default gen_random_uuid(),
   review_id uuid not null references reviews(id) on delete cascade,
   rating int not null check (rating between 1 and 4),
@@ -184,10 +172,10 @@ create table review_logs (
 );
 
 
--- ── analysis_jobs — tracks ingest progress for UI polling ──────────────────────
-create table analysis_jobs (
+-- ── analysis_jobs ──────────────────────────────────────────────────────────────
+create table if not exists analysis_jobs (
   id uuid primary key default gen_random_uuid(),
-  user_id uuid not null references profiles(id) on delete cascade,
+  user_id uuid not null references users(id) on delete cascade,
   kind text not null check (kind in ('initial_recent', 'historical_backfill', 'incremental')),
   status text not null default 'queued',
   games_total int not null default 0,
@@ -200,4 +188,4 @@ create table analysis_jobs (
   created_at timestamptz not null default now()
 );
 
-create index analysis_jobs_user on analysis_jobs(user_id, created_at desc);
+create index if not exists analysis_jobs_user on analysis_jobs(user_id, created_at desc);

@@ -8,6 +8,7 @@ from pydantic import BaseModel, field_validator
 # ── Onboarding ─────────────────────────────────────────────────────────────────
 
 class OnboardingRequest(BaseModel):
+    email: str
     chesscom_username: Optional[str] = None
     lichess_username: Optional[str] = None
 
@@ -18,15 +19,16 @@ class OnboardingRequest(BaseModel):
 
 
 class OnboardingResponse(BaseModel):
+    user_id: str
     job_id: str
 
 
-# ── Profile ────────────────────────────────────────────────────────────────────
+# ── User profile ───────────────────────────────────────────────────────────────
 
 class ProfileResponse(BaseModel):
     id: str
-    display_name: Optional[str]
     email: str
+    name: Optional[str]
     chesscom_username: Optional[str]
     lichess_username: Optional[str]
     subscription_status: str
@@ -54,6 +56,7 @@ class JobStatusResponse(BaseModel):
 # ── Ingest trigger ─────────────────────────────────────────────────────────────
 
 class IngestRequest(BaseModel):
+    user_id: str
     days: int = 30
 
 

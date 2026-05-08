@@ -1,23 +1,10 @@
-import { getSupabaseBrowserClient } from "./supabase";
-
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
-async function getAuthHeader(): Promise<Record<string, string>> {
-  const supabase = getSupabaseBrowserClient();
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
-  if (!session) return {};
-  return { Authorization: `Bearer ${session.access_token}` };
-}
-
 async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
-  const authHeader = await getAuthHeader();
   const res = await fetch(`${API_URL}${path}`, {
     ...init,
     headers: {
       "Content-Type": "application/json",
-      ...authHeader,
       ...init?.headers,
     },
   });
@@ -44,10 +31,10 @@ export type JobStatus = {
   created_at: string;
 };
 
-export type Profile = {
+export type UserProfile = {
   id: string;
-  display_name: string | null;
   email: string;
+  name: string | null;
   chesscom_username: string | null;
   lichess_username: string | null;
   subscription_status: string;
@@ -57,19 +44,44 @@ export type Profile = {
 };
 
 export const api = {
-  getMe: () => apiFetch<Profile>("/api/me"),
+  getMe: (userId: string) => apiFetch<UserProfile>(`/api/me?user_id=${userId}`),
 
-  onboarding: (chesscom_username: string | null, lichess_username: string | null) =>
-    apiFetch<{ job_id: string }>("/api/onboarding", {
+  onboarding: (email: string, chesscom_username: string | null, lichess_username: string | null) =>
+    apiFetch<{ user_id: string; job_id: string }>("/api/onboarding", {
       method: "POST",
-      body: JSON.stringify({ chesscom_username, lichess_username }),
+      body: JSON.stringify({ email, chesscom_username, lichess_username }),
     }),
 
-  getJob: (jobId: string) => apiFetch<JobStatus>(`/api/jobs/${jobId}`),
+  getJob: (jobId: string, userId: string) =>
+    apiFetch<JobStatus>(`/api/jobs/${jobId}?user_id=${userId}`),
 
-  triggerIngest: (days = 30) =>
-    apiFetch<{ job_id: string }>("/api/ingest", {
+  triggerIngest: (userId: string, days = 30) =>
+    apiFetch<{ user_id: string; job_id: string }>("/api/ingest", {
       method: "POST",
-      body: JSON.stringify({ days }),
+      body: JSON.stringify({ user_id: userId, days }),
     }),
 };
+
+// ── LocalStorage helpers for persisting user identity across sessions ─────────
+
+const STORAGE_KEY = "repertoire_user";
+
+export function saveUser(userId: string, email: string) {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(STORAGE_KEY, JSON.stringify({ userId, email }));
+}
+
+export function loadUser(): { userId: string; email: string } | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+export function clearUser() {
+  if (typeof window === "undefined") return;
+  localStorage.removeItem(STORAGE_KEY);
+}

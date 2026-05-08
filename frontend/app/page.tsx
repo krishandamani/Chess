@@ -1,114 +1,144 @@
-import Link from "next/link";
-import { Button } from "@/components/ui/button";
+"use client";
 
-export default function LandingPage() {
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { api, saveUser, loadUser } from "@/lib/api";
+
+export default function HomePage() {
+  const router = useRouter();
+  const [email, setEmail] = useState("");
+  const [chesscom, setChesscom] = useState("");
+  const [lichess, setLichess] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Redirect returning users straight to their dashboard
+  useEffect(() => {
+    const saved = loadUser();
+    if (saved) router.replace(`/dashboard?user_id=${saved.userId}`);
+  }, [router]);
+
+  async function handleStart(e: React.FormEvent) {
+    e.preventDefault();
+    if (!chesscom.trim() && !lichess.trim()) {
+      setError("Enter at least one chess username.");
+      return;
+    }
+    if (!email.trim()) {
+      setError("Enter your email so we can find your account next time.");
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    try {
+      const { user_id, job_id } = await api.onboarding(
+        email.trim(),
+        chesscom.trim() || null,
+        lichess.trim() || null,
+      );
+      saveUser(user_id, email.trim());
+      router.push(`/dashboard?user_id=${user_id}&job_id=${job_id}`);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Something went wrong.");
+      setLoading(false);
+    }
+  }
+
   return (
     <main className="flex flex-col min-h-screen">
       {/* Nav */}
       <nav className="border-b border-slate-200 bg-white">
-        <div className="max-w-5xl mx-auto px-6 h-16 flex items-center justify-between">
+        <div className="max-w-5xl mx-auto px-6 h-16 flex items-center">
           <span className="font-semibold text-lg tracking-tight">repertoire</span>
-          <div className="flex gap-3">
-            <Link href="/sign-in">
-              <Button variant="ghost" size="sm">Sign in</Button>
-            </Link>
-            <Link href="/sign-up">
-              <Button size="sm">Get started free</Button>
-            </Link>
-          </div>
         </div>
       </nav>
 
-      {/* Hero */}
-      <section className="flex-1 flex flex-col items-center justify-center px-6 py-24 text-center">
-        <p className="text-sm font-medium text-slate-500 mb-4 uppercase tracking-widest">
-          For the 1200–2000 player who actually wants to improve
-        </p>
-        <h1 className="text-4xl sm:text-5xl font-bold tracking-tight max-w-2xl leading-tight mb-6">
-          Stop solving random puzzles.
-          <br />
-          <span className="text-slate-500">Train the mistakes you actually make.</span>
-        </h1>
-        <p className="text-lg text-slate-600 max-w-xl mb-10">
-          Repertoire ingests all your Chess.com and Lichess games, finds the
-          exact recurring failures costing you rating points, and drills you on
-          them with spaced repetition.
-        </p>
-        <div className="flex gap-4 flex-wrap justify-center">
-          <Link href="/sign-up">
-            <Button size="lg">Analyze my games — free</Button>
-          </Link>
-          <a href="#how-it-works">
-            <Button size="lg" variant="outline">See how it works</Button>
-          </a>
-        </div>
-      </section>
-
-      {/* Differentiators */}
-      <section id="how-it-works" className="bg-white border-t border-slate-200 py-20 px-6">
-        <div className="max-w-4xl mx-auto">
-          <h2 className="text-2xl font-bold text-center mb-12">
-            Not puzzles from your games. <em>Patterns</em> from your games.
-          </h2>
-          <div className="grid sm:grid-cols-2 gap-8">
+      <div className="flex-1 flex flex-col lg:flex-row">
+        {/* Hero copy */}
+        <section className="flex-1 flex flex-col justify-center px-8 py-16 lg:py-0 lg:px-16 max-w-xl">
+          <p className="text-sm font-medium text-slate-500 mb-3 uppercase tracking-widest">
+            For the 1200–2000 player
+          </p>
+          <h1 className="text-4xl font-bold tracking-tight leading-tight mb-4">
+            Stop solving random puzzles.
+          </h1>
+          <p className="text-lg text-slate-600 mb-6">
+            We ingest <strong>all</strong> your Chess.com and Lichess games,
+            find the exact recurring mistakes costing you rating points, and
+            drill you on them until they stick.
+          </p>
+          <ul className="space-y-2 text-sm text-slate-600">
             {[
-              {
-                title: "Cross-game pattern detection",
-                body: "\"In 47 games this year you traded into a worse endgame from an equal position. In 31 of them you had a knight on a passive square.\"",
-              },
-              {
-                title: "Opening-aware analysis",
-                body: "Every mistake tagged with ECO code and move number. \"Of your 47 Caro-Kann mistakes, 31 came on moves 8–12.\"",
-              },
-              {
-                title: "Brutal, specific reports",
-                body: "\"You blunder tactically in 1 of every 7 rapid games. Fix tactics, not positional understanding.\"",
-              },
-              {
-                title: "Volume",
-                body: "Ingests all your games — 500, 5,000, 15,000. The more you've played, the more signal we find.",
-              },
-            ].map(({ title, body }) => (
-              <div key={title} className="p-6 rounded-xl border border-slate-200 bg-slate-50">
-                <h3 className="font-semibold mb-2">{title}</h3>
-                <p className="text-slate-600 text-sm leading-relaxed italic">{body}</p>
-              </div>
+              "Cross-game pattern detection — not just isolated puzzles",
+              "Opening-aware: \"you go wrong on move 9 of the Caro-Kann\"",
+              "Spaced repetition drill mode (FSRS)",
+              "Ingests 500 to 15,000 games",
+            ].map((f) => (
+              <li key={f} className="flex gap-2 items-start">
+                <span className="text-emerald-500 mt-0.5">✓</span>
+                <span>{f}</span>
+              </li>
             ))}
-          </div>
-        </div>
-      </section>
+          </ul>
+        </section>
 
-      {/* Pricing */}
-      <section className="py-20 px-6">
-        <div className="max-w-md mx-auto text-center">
-          <h2 className="text-2xl font-bold mb-4">Simple pricing</h2>
-          <div className="rounded-xl border border-slate-200 bg-white p-8">
-            <p className="text-4xl font-bold mb-1">$9<span className="text-lg font-normal text-slate-500">/mo</span></p>
-            <p className="text-slate-500 mb-6">or $79/yr — save $29</p>
-            <ul className="text-sm text-left space-y-2 mb-8 text-slate-700">
-              {[
-                "Unlimited games ingested",
-                "All pattern detectors",
-                "Spaced repetition drill mode",
-                "Weekly email report",
-                "ECO opening analysis",
-              ].map((f) => (
-                <li key={f} className="flex gap-2 items-center">
-                  <span className="text-emerald-500">✓</span> {f}
-                </li>
-              ))}
-            </ul>
-            <Link href="/sign-up">
-              <Button className="w-full" size="lg">Start 14-day free trial</Button>
-            </Link>
-            <p className="text-xs text-slate-400 mt-3">No credit card required.</p>
-          </div>
-        </div>
-      </section>
-
-      <footer className="border-t border-slate-200 py-6 text-center text-sm text-slate-400">
-        © {new Date().getFullYear()} Repertoire. Built for chess improvers.
-      </footer>
+        {/* Sign-up form */}
+        <section className="flex-1 flex items-center justify-center px-8 py-12 bg-slate-50">
+          <Card className="w-full max-w-sm">
+            <CardHeader>
+              <CardTitle>Analyze my games</CardTitle>
+              <CardDescription>
+                No account needed. Enter your chess username and we&apos;ll get started.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleStart} className="space-y-4">
+                <div className="space-y-1">
+                  <Label htmlFor="email">Your email</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    placeholder="you@example.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                  />
+                  <p className="text-xs text-slate-400">Used to find your data if you return.</p>
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="chesscom">Chess.com username</Label>
+                  <Input
+                    id="chesscom"
+                    placeholder="e.g. hikaru"
+                    value={chesscom}
+                    onChange={(e) => setChesscom(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="lichess">Lichess username</Label>
+                  <Input
+                    id="lichess"
+                    placeholder="e.g. DrNykterstein"
+                    value={lichess}
+                    onChange={(e) => setLichess(e.target.value)}
+                  />
+                </div>
+                {error && <p className="text-sm text-red-500">{error}</p>}
+                <Button type="submit" className="w-full" disabled={loading}>
+                  {loading ? "Starting…" : "Analyze my games →"}
+                </Button>
+                <p className="text-xs text-center text-slate-400">
+                  We only access your public game history.
+                </p>
+              </form>
+            </CardContent>
+          </Card>
+        </section>
+      </div>
     </main>
   );
 }
