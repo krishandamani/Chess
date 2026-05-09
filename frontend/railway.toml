@@ -1,5 +1,6 @@
 [build]
 builder = "nixpacks"
+buildCommand = "npm run build && cp -r public .next/standalone/ && cp -r .next/static .next/standalone/.next/"
 
 [deploy]
 startCommand = "HOSTNAME=0.0.0.0 node .next/standalone/server.js"
