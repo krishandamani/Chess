@@ -33,7 +33,7 @@ export type JobStatus = {
 
 export type UserProfile = {
   id: string;
-  email: string;
+  email: string | null;
   name: string | null;
   chesscom_username: string | null;
   lichess_username: string | null;
@@ -46,10 +46,10 @@ export type UserProfile = {
 export const api = {
   getMe: (userId: string) => apiFetch<UserProfile>(`/api/me?user_id=${userId}`),
 
-  onboarding: (email: string, chesscom_username: string | null, lichess_username: string | null) =>
+  onboarding: (chesscom_username: string | null, lichess_username: string | null) =>
     apiFetch<{ user_id: string; job_id: string }>("/api/onboarding", {
       method: "POST",
-      body: JSON.stringify({ email, chesscom_username, lichess_username }),
+      body: JSON.stringify({ chesscom_username, lichess_username }),
     }),
 
   getJob: (jobId: string, userId: string) =>
@@ -66,12 +66,12 @@ export const api = {
 
 const STORAGE_KEY = "repertoire_user";
 
-export function saveUser(userId: string, email: string) {
+export function saveUser(userId: string) {
   if (typeof window === "undefined") return;
-  localStorage.setItem(STORAGE_KEY, JSON.stringify({ userId, email }));
+  localStorage.setItem(STORAGE_KEY, JSON.stringify({ userId }));
 }
 
-export function loadUser(): { userId: string; email: string } | null {
+export function loadUser(): { userId: string } | null {
   if (typeof window === "undefined") return null;
   try {
     const raw = localStorage.getItem(STORAGE_KEY);

@@ -8,7 +8,6 @@ from pydantic import BaseModel, field_validator
 # ── Onboarding ─────────────────────────────────────────────────────────────────
 
 class OnboardingRequest(BaseModel):
-    email: str
     chesscom_username: Optional[str] = None
     lichess_username: Optional[str] = None
 
@@ -27,7 +26,7 @@ class OnboardingResponse(BaseModel):
 
 class ProfileResponse(BaseModel):
     id: str
-    email: str
+    email: Optional[str]
     name: Optional[str]
     chesscom_username: Optional[str]
     lichess_username: Optional[str]

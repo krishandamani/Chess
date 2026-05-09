@@ -17,27 +17,42 @@ async def onboarding(body: OnboardingRequest):
 
     pool = await get_pool()
     async with pool.acquire() as conn:
-        user_id: str = await conn.fetchval(
-            """
-            INSERT INTO users (email)
-            VALUES ($1)
-            ON CONFLICT (email) DO UPDATE SET email = EXCLUDED.email
-            RETURNING id::text
-            """,
-            body.email,
-        )
+        # Find existing user by chess username (allows recovery if localStorage cleared)
+        user_id: str | None = None
+        if body.chesscom_username:
+            user_id = await conn.fetchval(
+                "SELECT id::text FROM users WHERE chesscom_username = $1",
+                body.chesscom_username,
+            )
+        if not user_id and body.lichess_username:
+            user_id = await conn.fetchval(
+                "SELECT id::text FROM users WHERE lichess_username = $1",
+                body.lichess_username,
+            )
 
-        await conn.execute(
-            """
-            UPDATE users
-            SET chesscom_username = COALESCE($2, chesscom_username),
-                lichess_username  = COALESCE($3, lichess_username)
-            WHERE id = $1::uuid
-            """,
-            user_id,
-            body.chesscom_username,
-            body.lichess_username,
-        )
+        if user_id:
+            # Update usernames in case they added the other platform
+            await conn.execute(
+                """
+                UPDATE users
+                SET chesscom_username = COALESCE($2, chesscom_username),
+                    lichess_username  = COALESCE($3, lichess_username)
+                WHERE id = $1::uuid
+                """,
+                user_id,
+                body.chesscom_username,
+                body.lichess_username,
+            )
+        else:
+            user_id = await conn.fetchval(
+                """
+                INSERT INTO users (chesscom_username, lichess_username)
+                VALUES ($1, $2)
+                RETURNING id::text
+                """,
+                body.chesscom_username,
+                body.lichess_username,
+            )
 
         job_id: str = await conn.fetchval(
             """
